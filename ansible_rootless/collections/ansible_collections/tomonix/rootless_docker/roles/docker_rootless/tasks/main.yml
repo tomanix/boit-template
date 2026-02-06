@@ -1,0 +1,144 @@
+---
+- name: Validate supported distribution
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family == "Debian"
+      - ansible_distribution in ["Debian", "Ubuntu"]
+    fail_msg: "Role docker_rootless supports Debian/Ubuntu only."
+
+- name: Build Docker package list
+  ansible.builtin.set_fact:
+    docker_rootless_packages: >-
+      {{
+        [
+          'docker-ce',
+          'docker-ce-cli',
+          'containerd.io',
+          'docker-buildx-plugin',
+          'docker-ce-rootless-extras'
+        ]
+        + (['docker-compose-plugin'] if docker_rootless_install_compose_plugin else [])
+        + docker_rootless_extra_packages
+      }}
+
+- name: Install rootless dependencies and Docker packages
+  ansible.builtin.apt:
+    name: >-
+      {{
+        ['uidmap', 'dbus-user-session', 'slirp4netns', 'fuse-overlayfs', 'iptables']
+        + docker_rootless_packages
+      }}
+    state: present
+    update_cache: true
+
+- name: Create dedicated Docker service account
+  ansible.builtin.user:
+    name: "{{ docker_rootless_service_user }}"
+    shell: "{{ docker_rootless_service_user_shell }}"
+    home: "{{ docker_rootless_service_user_home }}"
+    create_home: "{{ docker_rootless_service_user_create_home }}"
+    system: true
+
+- name: Read service user account details
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ docker_rootless_service_user }}"
+
+- name: Set service user UID/GID facts
+  ansible.builtin.set_fact:
+    docker_rootless_user_uid: "{{ ansible_facts.getent_passwd[docker_rootless_service_user][1] | int }}"
+    docker_rootless_user_gid: "{{ ansible_facts.getent_passwd[docker_rootless_service_user][2] | int }}"
+
+- name: Ensure subuid is defined for service account
+  ansible.builtin.lineinfile:
+    path: /etc/subuid
+    regexp: "^{{ docker_rootless_service_user }}:"
+    line: "{{ docker_rootless_service_user }}:100000:65536"
+    create: true
+
+- name: Ensure subgid is defined for service account
+  ansible.builtin.lineinfile:
+    path: /etc/subgid
+    regexp: "^{{ docker_rootless_service_user }}:"
+    line: "{{ docker_rootless_service_user }}:100000:65536"
+    create: true
+
+- name: Enable linger for service account
+  ansible.builtin.command:
+    cmd: "loginctl enable-linger {{ docker_rootless_service_user }}"
+  changed_when: false
+
+- name: Ensure runtime directory exists
+  ansible.builtin.file:
+    path: "/run/user/{{ docker_rootless_user_uid }}"
+    state: directory
+    owner: "{{ docker_rootless_service_user }}"
+    group: "{{ docker_rootless_service_user }}"
+    mode: "0700"
+
+- name: Install rootless Docker daemon for service account
+  ansible.builtin.command:
+    cmd: dockerd-rootless-setuptool.sh install --force
+    creates: "{{ docker_rootless_service_user_home }}/.config/systemd/user/docker.service"
+  become: true
+  become_user: "{{ docker_rootless_service_user }}"
+  environment:
+    HOME: "{{ docker_rootless_service_user_home }}"
+    USER: "{{ docker_rootless_service_user }}"
+    XDG_RUNTIME_DIR: "/run/user/{{ docker_rootless_user_uid }}"
+
+- name: Ensure user-level docker service is enabled and started
+  ansible.builtin.command:
+    cmd: systemctl --user enable --now docker
+  become: true
+  become_user: "{{ docker_rootless_service_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ docker_rootless_user_uid }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ docker_rootless_user_uid }}/bus"
+  changed_when: false
+  when: docker_rootless_state == 'started'
+
+- name: Ensure user-level docker service is stopped
+  ansible.builtin.command:
+    cmd: systemctl --user disable --now docker
+  become: true
+  become_user: "{{ docker_rootless_service_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ docker_rootless_user_uid }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ docker_rootless_user_uid }}/bus"
+  changed_when: false
+  when: docker_rootless_state == 'stopped'
+
+- name: Install environment profile for rootless Docker socket
+  ansible.builtin.template:
+    src: docker-rootless-env.sh.j2
+    dest: "{{ docker_rootless_env_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Ensure service user shell exports DOCKER_HOST
+  ansible.builtin.lineinfile:
+    path: "{{ docker_rootless_user_bashrc_path }}"
+    line: "export DOCKER_HOST=unix:///run/user/{{ docker_rootless_user_uid }}/docker.sock"
+    create: true
+    owner: "{{ docker_rootless_service_user }}"
+    group: "{{ docker_rootless_service_user }}"
+    mode: "0644"
+  when: docker_rootless_user_bashrc_manage
+
+- name: Disable rootful Docker service
+  ansible.builtin.systemd:
+    name: docker.service
+    state: stopped
+    enabled: false
+    masked: true
+  when: docker_rootless_disable_system_service
+
+- name: Disable rootful Docker socket
+  ansible.builtin.systemd:
+    name: docker.socket
+    state: stopped
+    enabled: false
+    masked: true
+  when: docker_rootless_disable_system_service

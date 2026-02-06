@@ -1,0 +1,14 @@
+---
+# Dedicated service account that owns the rootless Docker daemon.
+docker_rootless_service_user: svc_docker
+
+docker_rootless_service_user_shell: /bin/bash
+docker_rootless_service_user_home: "/home/{{ docker_rootless_service_user }}"
+docker_rootless_service_user_create_home: true
+
+docker_rootless_state: started
+
+docker_rootless_install_compose_plugin: true
+
+# Set to false if you intentionally want system docker service enabled.
+docker_rootless_disable_system_service: true

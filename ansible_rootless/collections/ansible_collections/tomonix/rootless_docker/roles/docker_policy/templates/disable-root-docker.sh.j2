@@ -1,0 +1,8 @@
+# Managed by Ansible - prevent root from invoking docker CLI directly.
+# Note: root can always bypass shell-level controls by design.
+if [ "$(id -u 2>/dev/null)" -eq 0 ]; then
+  docker() {
+    echo "Docker CLI usage as root is disabled by policy. Use account '{{ docker_rootless_service_user }}'." >&2
+    return 1
+  }
+fi

@@ -1,0 +1,6 @@
+---
+docker_apt_repo_state: present
+docker_apt_channel: stable
+docker_apt_repo_filename: docker
+docker_apt_keyring_path: /etc/apt/keyrings/docker.asc
+docker_apt_repo_base_url: https://download.docker.com/linux

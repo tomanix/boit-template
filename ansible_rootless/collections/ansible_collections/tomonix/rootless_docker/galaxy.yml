@@ -1,0 +1,21 @@
+---
+namespace: tomonix
+name: rootless_docker
+version: 1.0.0
+readme: README.md
+authors:
+  - tomonix
+description: Rootless Docker deployment for Debian/Ubuntu with a dedicated service account.
+license:
+  - MIT
+tags:
+  - docker
+  - rootless
+  - debian
+  - ubuntu
+  - security
+dependencies: {}
+repository: https://example.invalid/tomonix/rootless_docker
+issues: https://example.invalid/tomonix/rootless_docker/issues
+build_ignore:
+  - '*.tar.gz'

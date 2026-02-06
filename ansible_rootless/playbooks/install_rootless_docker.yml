@@ -1,0 +1,13 @@
+---
+- name: Install Docker rootless with dedicated service account
+  hosts: docker_rootless_hosts
+  become: true
+  gather_facts: true
+
+  collections:
+    - tomonix.rootless_docker
+
+  roles:
+    - role: docker_repo
+    - role: docker_rootless
+    - role: docker_policy

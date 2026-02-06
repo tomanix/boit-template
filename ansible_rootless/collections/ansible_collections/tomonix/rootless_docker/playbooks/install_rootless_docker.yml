@@ -1,0 +1,9 @@
+---
+- name: Install rootless Docker via collection roles
+  hosts: docker_rootless_local_hosts
+  become: true
+  gather_facts: true
+  roles:
+    - role: tomonix.rootless_docker.docker_repo
+    - role: tomonix.rootless_docker.docker_rootless
+    - role: tomonix.rootless_docker.docker_policy

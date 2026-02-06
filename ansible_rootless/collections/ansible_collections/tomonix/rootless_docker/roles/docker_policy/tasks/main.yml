@@ -1,0 +1,15 @@
+---
+- name: Assert service account variable is set
+  ansible.builtin.assert:
+    that:
+      - docker_rootless_service_user is string
+      - docker_rootless_service_user | length > 0
+
+- name: Deploy root CLI block profile
+  ansible.builtin.template:
+    src: disable-root-docker.sh.j2
+    dest: "{{ docker_policy_root_block_script_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: docker_policy_enforce_root_cli_block

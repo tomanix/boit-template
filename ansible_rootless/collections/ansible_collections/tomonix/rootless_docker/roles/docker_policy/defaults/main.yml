@@ -1,0 +1,3 @@
+---
+docker_policy_enforce_root_cli_block: true
+docker_policy_root_block_script_path: /etc/profile.d/disable-root-docker.sh

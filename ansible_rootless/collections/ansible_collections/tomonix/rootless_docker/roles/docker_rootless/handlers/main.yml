@@ -1,0 +1,10 @@
+---
+- name: Restart rootless docker user service
+  ansible.builtin.command:
+    cmd: systemctl --user restart docker
+  become: true
+  become_user: "{{ docker_rootless_service_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ docker_rootless_user_uid }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ docker_rootless_user_uid }}/bus"
+  changed_when: true

@@ -1,0 +1,35 @@
+---
+- name: Validate supported OS family
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family == "Debian"
+      - ansible_distribution in ["Debian", "Ubuntu"]
+    fail_msg: "This collection currently supports Debian and Ubuntu only."
+
+- name: Ensure APT keyring directory exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Download Docker APT signing key
+  ansible.builtin.get_url:
+    url: "{{ docker_apt_repo_base_url }}/{{ ansible_distribution | lower }}/gpg"
+    dest: "{{ docker_apt_keyring_path }}"
+    mode: "0644"
+
+- name: Configure Docker APT repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch={{ ansible_architecture | tomonix.rootless_docker.rootless_docker_apt_arch }}
+      signed-by={{ docker_apt_keyring_path }}]
+      {{ docker_apt_repo_base_url }}/{{ ansible_distribution | lower }}
+      {{ ansible_distribution_release }} {{ docker_apt_channel }}
+    state: "{{ docker_apt_repo_state }}"
+    filename: "{{ docker_apt_repo_filename }}"
+  register: docker_repo_config
+
+- name: Refresh APT cache when Docker repo changed
+  ansible.builtin.apt:
+    update_cache: true
+  when: docker_repo_config.changed

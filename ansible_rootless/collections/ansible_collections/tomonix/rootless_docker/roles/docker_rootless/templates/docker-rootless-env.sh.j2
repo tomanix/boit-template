@@ -1,0 +1,6 @@
+# Managed by Ansible - rootless Docker environment for {{ docker_rootless_service_user }}
+export DOCKER_HOST=unix:///run/user/{{ docker_rootless_user_uid }}/docker.sock
+
+if [ "$(id -un 2>/dev/null)" = "{{ docker_rootless_service_user }}" ]; then
+  export PATH=/usr/bin:$PATH
+fi

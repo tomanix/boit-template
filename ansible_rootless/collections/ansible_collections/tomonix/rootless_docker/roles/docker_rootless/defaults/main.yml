@@ -1,0 +1,15 @@
+---
+docker_rootless_service_user: svc_docker
+docker_rootless_service_user_shell: /bin/bash
+docker_rootless_service_user_home: "/home/{{ docker_rootless_service_user }}"
+docker_rootless_service_user_create_home: true
+
+docker_rootless_disable_system_service: true
+docker_rootless_state: started
+
+docker_rootless_install_compose_plugin: true
+docker_rootless_extra_packages: []
+
+docker_rootless_env_path: "/etc/profile.d/docker-rootless-{{ docker_rootless_service_user }}.sh"
+docker_rootless_user_bashrc_manage: true
+docker_rootless_user_bashrc_path: "{{ docker_rootless_service_user_home }}/.bashrc"
