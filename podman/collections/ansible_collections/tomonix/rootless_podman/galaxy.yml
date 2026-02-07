@@ -1,0 +1,23 @@
+---
+namespace: tomonix
+name: rootless_podman
+version: 1.0.0
+readme: README.md
+authors:
+  - tomonix
+description: Rootless Podman + podman-compose deployment on Debian/Ubuntu/RHEL with dedicated service account.
+license:
+  - MIT
+tags:
+  - podman
+  - rootless
+  - compose
+  - debian
+  - ubuntu
+  - rhel
+  - security
+dependencies: {}
+repository: https://example.invalid/tomonix/rootless_podman
+issues: https://example.invalid/tomonix/rootless_podman/issues
+build_ignore:
+  - '*.tar.gz'

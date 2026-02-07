@@ -1,0 +1,18 @@
+---
+# Dedicated service account that owns the rootless Podman socket.
+podman_rootless_service_user: svc_podman
+
+podman_rootless_service_user_shell: /bin/bash
+podman_rootless_service_user_home: "/home/{{ podman_rootless_service_user }}"
+podman_rootless_service_user_create_home: true
+
+podman_rootless_state: started
+podman_rootless_socket_state: started
+
+podman_rootless_install_compose: true
+podman_rootless_compose_fallback_to_pip: true
+
+# Set to false if you intentionally want Docker system service enabled.
+container_policy_disable_docker_system_service: true
+container_policy_enforce_root_docker_cli_block: true
+container_policy_enforce_podman_service_account_only: true

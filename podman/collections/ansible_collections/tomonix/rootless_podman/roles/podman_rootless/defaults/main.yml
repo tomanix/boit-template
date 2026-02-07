@@ -1,0 +1,19 @@
+---
+podman_rootless_service_user: svc_podman
+podman_rootless_service_user_shell: /bin/bash
+podman_rootless_service_user_home: "/home/{{ podman_rootless_service_user }}"
+podman_rootless_service_user_create_home: true
+
+podman_rootless_state: started
+podman_rootless_socket_state: started
+
+podman_rootless_install_compose: true
+podman_rootless_compose_fallback_to_pip: true
+podman_rootless_extra_packages: []
+
+podman_rootless_subuid_start: 100000
+podman_rootless_subuid_count: 65536
+
+podman_rootless_env_path: "/etc/profile.d/podman-rootless-{{ podman_rootless_service_user }}.sh"
+podman_rootless_user_shell_rc_manage: true
+podman_rootless_user_shell_rc_path: "{{ podman_rootless_service_user_home }}/.bashrc"

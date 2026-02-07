@@ -1,0 +1,6 @@
+# Managed by Ansible - rootless Podman environment for {{ podman_rootless_service_user }}
+export CONTAINER_HOST={{ podman_rootless_user_uid | tomonix.rootless_podman.rootless_podman_socket }}
+
+if [ "$(id -un 2>/dev/null)" = "{{ podman_rootless_service_user }}" ]; then
+  export PATH=/usr/bin:$PATH
+fi

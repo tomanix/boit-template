@@ -1,0 +1,24 @@
+# Managed by Ansible - container CLI policy.
+# Note: shell-level controls are an operations policy and can be bypassed by root.
+
+{% if container_policy_enforce_root_docker_cli_block %}
+if [ "$(id -u 2>/dev/null)" -eq 0 ]; then
+  docker() {
+    echo "Docker CLI usage as root is disabled by policy." >&2
+    return 1
+  }
+fi
+{% endif %}
+
+{% if container_policy_enforce_podman_service_account_only %}
+if [ "$(id -un 2>/dev/null)" != "{{ podman_rootless_service_user }}" ]; then
+  podman() {
+    echo "Podman usage is restricted to '{{ podman_rootless_service_user }}'." >&2
+    return 1
+  }
+  podman-compose() {
+    echo "podman-compose usage is restricted to '{{ podman_rootless_service_user }}'." >&2
+    return 1
+  }
+fi
+{% endif %}

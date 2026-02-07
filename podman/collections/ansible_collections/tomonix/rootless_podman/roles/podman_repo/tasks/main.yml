@@ -1,0 +1,29 @@
+---
+- name: Validate supported distribution family
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution | tomonix.rootless_podman.rootless_podman_supported(ansible_os_family)
+    fail_msg: "Role podman_repo supports Debian/Ubuntu and RedHat family only."
+
+- name: Refresh APT cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when:
+    - podman_repo_manage_cache
+    - ansible_os_family == 'Debian'
+
+- name: Install EPEL repository on RedHat family
+  ansible.builtin.package:
+    name: epel-release
+    state: present
+  when:
+    - podman_repo_enable_epel_on_redhat
+    - ansible_os_family == 'RedHat'
+
+- name: Refresh DNF metadata cache
+  ansible.builtin.dnf:
+    update_cache: true
+  when:
+    - podman_repo_manage_cache
+    - ansible_os_family == 'RedHat'

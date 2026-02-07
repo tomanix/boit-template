@@ -1,0 +1,152 @@
+---
+- name: Validate supported distribution
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution | tomonix.rootless_podman.rootless_podman_supported(ansible_os_family)
+    fail_msg: "Role podman_rootless supports Debian/Ubuntu and RedHat family only."
+
+- name: Build package list for rootless Podman
+  ansible.builtin.set_fact:
+    podman_rootless_packages: >-
+      {{
+        (ansible_os_family | tomonix.rootless_podman.rootless_podman_packages(podman_rootless_install_compose))
+        + podman_rootless_extra_packages
+      }}
+
+- name: Install rootless Podman packages
+  block:
+    - name: Install package set including podman-compose when enabled
+      ansible.builtin.package:
+        name: "{{ podman_rootless_packages }}"
+        state: present
+  rescue:
+    - name: Fail if compose fallback is disabled
+      ansible.builtin.fail:
+        msg: >-
+          Failed to install package list {{ podman_rootless_packages }}.
+          Set podman_rootless_compose_fallback_to_pip=true to install podman-compose via pip.
+      when: not podman_rootless_compose_fallback_to_pip
+
+    - name: Build base package list without podman-compose
+      ansible.builtin.set_fact:
+        podman_rootless_packages_no_compose: "{{ podman_rootless_packages | reject('equalto', 'podman-compose') | list }}"
+
+    - name: Install package set without podman-compose
+      ansible.builtin.package:
+        name: "{{ podman_rootless_packages_no_compose }}"
+        state: present
+
+    - name: Install python3-pip for compose fallback
+      ansible.builtin.package:
+        name: python3-pip
+        state: present
+      when: podman_rootless_install_compose
+
+    - name: Install podman-compose from pip as fallback
+      ansible.builtin.pip:
+        name: podman-compose
+        state: present
+      when: podman_rootless_install_compose
+
+- name: Create dedicated Podman service account
+  ansible.builtin.user:
+    name: "{{ podman_rootless_service_user }}"
+    shell: "{{ podman_rootless_service_user_shell }}"
+    home: "{{ podman_rootless_service_user_home }}"
+    create_home: "{{ podman_rootless_service_user_create_home }}"
+    system: true
+
+- name: Read service user account details
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ podman_rootless_service_user }}"
+
+- name: Set service user UID/GID facts
+  ansible.builtin.set_fact:
+    podman_rootless_user_uid: "{{ ansible_facts.getent_passwd[podman_rootless_service_user][1] | int }}"
+    podman_rootless_user_gid: "{{ ansible_facts.getent_passwd[podman_rootless_service_user][2] | int }}"
+
+- name: Ensure subuid is defined for service account
+  ansible.builtin.lineinfile:
+    path: /etc/subuid
+    regexp: "^{{ podman_rootless_service_user }}:"
+    line: "{{ podman_rootless_service_user }}:{{ podman_rootless_subuid_start }}:{{ podman_rootless_subuid_count }}"
+    create: true
+
+- name: Ensure subgid is defined for service account
+  ansible.builtin.lineinfile:
+    path: /etc/subgid
+    regexp: "^{{ podman_rootless_service_user }}:"
+    line: "{{ podman_rootless_service_user }}:{{ podman_rootless_subuid_start }}:{{ podman_rootless_subuid_count }}"
+    create: true
+
+- name: Enable linger for service account
+  ansible.builtin.command:
+    cmd: "loginctl enable-linger {{ podman_rootless_service_user }}"
+  changed_when: false
+
+- name: Ensure runtime directory exists
+  ansible.builtin.file:
+    path: "/run/user/{{ podman_rootless_user_uid }}"
+    state: directory
+    owner: "{{ podman_rootless_service_user }}"
+    group: "{{ podman_rootless_service_user }}"
+    mode: "0700"
+
+- name: Ensure Podman runtime socket directory exists
+  ansible.builtin.file:
+    path: "/run/user/{{ podman_rootless_user_uid }}/podman"
+    state: directory
+    owner: "{{ podman_rootless_service_user }}"
+    group: "{{ podman_rootless_service_user }}"
+    mode: "0700"
+
+- name: Ensure user-level podman socket is enabled and started
+  ansible.builtin.command:
+    cmd: systemctl --user enable --now podman.socket
+  become: true
+  become_user: "{{ podman_rootless_service_user }}"
+  environment:
+    HOME: "{{ podman_rootless_service_user_home }}"
+    USER: "{{ podman_rootless_service_user }}"
+    XDG_RUNTIME_DIR: "/run/user/{{ podman_rootless_user_uid }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ podman_rootless_user_uid }}/bus"
+  changed_when: false
+  when: podman_rootless_socket_state == 'started'
+
+- name: Ensure user-level podman socket is stopped
+  ansible.builtin.command:
+    cmd: systemctl --user disable --now podman.socket
+  become: true
+  become_user: "{{ podman_rootless_service_user }}"
+  environment:
+    HOME: "{{ podman_rootless_service_user_home }}"
+    USER: "{{ podman_rootless_service_user }}"
+    XDG_RUNTIME_DIR: "/run/user/{{ podman_rootless_user_uid }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ podman_rootless_user_uid }}/bus"
+  changed_when: false
+  when: podman_rootless_socket_state == 'stopped'
+
+- name: Validate podman logical state value
+  ansible.builtin.assert:
+    that:
+      - podman_rootless_state in ['started', 'stopped']
+    fail_msg: "podman_rootless_state must be 'started' or 'stopped'."
+
+- name: Ensure service user has PODMAN socket in shell rc
+  ansible.builtin.lineinfile:
+    path: "{{ podman_rootless_user_shell_rc_path }}"
+    line: "export CONTAINER_HOST={{ podman_rootless_user_uid | tomonix.rootless_podman.rootless_podman_socket }}"
+    create: true
+    owner: "{{ podman_rootless_service_user }}"
+    group: "{{ podman_rootless_service_user }}"
+    mode: "0644"
+  when: podman_rootless_user_shell_rc_manage
+
+- name: Install environment profile for rootless Podman socket
+  ansible.builtin.template:
+    src: podman-rootless-env.sh.j2
+    dest: "{{ podman_rootless_env_path }}"
+    owner: root
+    group: root
+    mode: "0644"

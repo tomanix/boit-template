@@ -1,0 +1,9 @@
+---
+- name: Install rootless Podman via collection roles
+  hosts: podman_rootless_local_hosts
+  become: true
+  gather_facts: true
+  roles:
+    - role: tomonix.rootless_podman.podman_repo
+    - role: tomonix.rootless_podman.podman_rootless
+    - role: tomonix.rootless_podman.container_policy

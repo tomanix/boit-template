@@ -1,0 +1,13 @@
+---
+- name: Install Podman rootless with dedicated service account
+  hosts: podman_rootless_remote_hosts
+  become: true
+  gather_facts: true
+
+  collections:
+    - tomonix.rootless_podman
+
+  roles:
+    - role: podman_repo
+    - role: podman_rootless
+    - role: container_policy

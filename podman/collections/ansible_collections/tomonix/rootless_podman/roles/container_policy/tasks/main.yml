@@ -1,0 +1,33 @@
+---
+- name: Assert service account variable is set
+  ansible.builtin.assert:
+    that:
+      - podman_rootless_service_user is string
+      - podman_rootless_service_user | length > 0
+
+- name: Stop and disable Docker service
+  ansible.builtin.systemd:
+    name: docker.service
+    state: stopped
+    enabled: false
+    masked: true
+  failed_when: false
+  when: container_policy_disable_docker_system_service
+
+- name: Stop and disable Docker socket
+  ansible.builtin.systemd:
+    name: docker.socket
+    state: stopped
+    enabled: false
+    masked: true
+  failed_when: false
+  when: container_policy_disable_docker_system_service
+
+- name: Deploy container CLI block profile
+  ansible.builtin.template:
+    src: disable-root-docker.sh.j2
+    dest: "{{ container_policy_block_script_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: container_policy_enforce_root_docker_cli_block or container_policy_enforce_podman_service_account_only
