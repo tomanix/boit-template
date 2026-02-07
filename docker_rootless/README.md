@@ -1,13 +1,13 @@
 # `tomonix.rootless_docker`
 
-Collection Ansible pour déployer Docker Engine et Docker Compose en mode rootless sur Debian/Ubuntu avec un compte de service dédié (`svc_docker`) et une politique de blocage côté `root`.
+An Ansible collection to deploy Docker Engine and Docker Compose in rootless mode on Debian/Ubuntu with a dedicated service account (`svc_docker`) and a root-side blocking policy.
 
-## Objectifs
+## Objectives
 
-- Installer Docker rootless avec un compte de service non privilégié.
-- Désactiver le mode rootful (`docker.service` et `docker.socket`).
-- Standardiser l’environnement (`DOCKER_HOST`) pour l’exploitation.
-- Fournir une collection lisible, modulaire et idempotente.
+- Install rootless Docker with a non-privileged service account.
+- Disable rootful mode (`docker.service` and `docker.socket`).
+- Standardize the runtime environment (`DOCKER_HOST`) for operations.
+- Provide a readable, modular, and idempotent collection.
 
 ## Architecture
 
@@ -16,28 +16,28 @@ flowchart TD
   A[Playbook install_rootless_docker.yml] --> B[docker_repo]
   A --> C[docker_rootless]
   A --> D[docker_policy]
-  B --> E[Repo APT Docker officiel]
-  C --> F[Compte svc_docker]
-  C --> G[dockerd rootless --user]
+  B --> E[Official Docker APT repository]
+  C --> F[svc_docker account]
+  C --> G[rootless dockerd --user]
   C --> H[docker compose plugin]
-  C --> I[docker.service rootful masque]
-  D --> J[Blocage CLI docker pour root]
+  C --> I[rootful docker.service masked]
+  D --> J[Docker CLI blocked for root]
 ```
 
-## Sequence d execution
+## Execution Sequence
 
 ```mermaid
 sequenceDiagram
   participant Ansible
   participant Host as Debian/Ubuntu Host
   participant Svc as svc_docker
-  Ansible->>Host: Configure repo Docker + cle GPG
-  Ansible->>Host: Install packages docker rootless
+  Ansible->>Host: Configure Docker repo + GPG key
+  Ansible->>Host: Install rootless Docker packages
   Ansible->>Host: Create svc_docker + subuid/subgid
   Ansible->>Svc: dockerd-rootless-setuptool.sh install
   Ansible->>Svc: systemctl --user enable --now docker
   Ansible->>Host: Mask docker.service + docker.socket
-  Ansible->>Host: Deploy policy de blocage docker pour root
+  Ansible->>Host: Deploy root Docker blocking policy
 ```
 
 ## Roles
@@ -46,24 +46,24 @@ sequenceDiagram
 - `tomonix.rootless_docker.docker_rootless`
 - `tomonix.rootless_docker.docker_policy`
 
-## Variables principales
+## Main Variables
 
-| Variable | Valeur par defaut | Description |
+| Variable | Default value | Description |
 |---|---|---|
-| `docker_rootless_service_user` | `svc_docker` | Compte de service du daemon rootless |
-| `docker_rootless_state` | `started` | Etat du service user Docker (`started` ou `stopped`) |
-| `docker_rootless_install_compose_plugin` | `true` | Installe le plugin `docker compose` |
-| `docker_rootless_disable_system_service` | `true` | Masque `docker.service` et `docker.socket` rootful |
-| `docker_policy_enforce_root_cli_block` | `true` | Bloque l’usage direct de `docker` par root via profile shell |
+| `docker_rootless_service_user` | `svc_docker` | Service account for the rootless daemon |
+| `docker_rootless_state` | `started` | Docker user service state (`started` or `stopped`) |
+| `docker_rootless_install_compose_plugin` | `true` | Installs the `docker compose` plugin |
+| `docker_rootless_disable_system_service` | `true` | Masks rootful `docker.service` and `docker.socket` |
+| `docker_policy_enforce_root_cli_block` | `true` | Blocks direct root usage of `docker` via shell profile |
 
-## Prerequis
+## Prerequisites
 
 - `ansible-core >= 2.14`
-- Hote cible Debian ou Ubuntu
-- Acces SSH et privilege escalation (`become`)
-- Internet sur les hotes cibles (repo Docker officiel)
+- Debian or Ubuntu target host
+- SSH access and privilege escalation (`become`)
+- Internet access on target hosts (official Docker repository)
 
-## Inventaire exemple
+## Example Inventory
 
 ```yaml
 all:
@@ -85,31 +85,31 @@ all:
               ansible_host: 127.0.0.1
 ```
 
-## Execution
+## Run
 
-Run standard:
+Standard run:
 
 ```bash
 ansible-playbook collections/ansible_collections/tomonix/rootless_docker/playbooks/install_rootless_docker.yml
 ```
 
-Cibler uniquement les hotes distants:
+Target remote hosts only:
 
 ```bash
 ansible-playbook collections/ansible_collections/tomonix/rootless_docker/playbooks/install_rootless_docker.yml \
   -l docker_rootless_remote_hosts
 ```
 
-Mode verification (dry-run):
+Verification mode (dry-run):
 
 ```bash
 ansible-playbook --check --diff \
   collections/ansible_collections/tomonix/rootless_docker/playbooks/install_rootless_docker.yml
 ```
 
-## Verification post-install
+## Post-Install Verification
 
-Sur l hote cible:
+On the target host:
 
 ```bash
 su - svc_docker -c 'docker info'
@@ -117,21 +117,21 @@ su - svc_docker -c 'docker compose version'
 systemctl status docker.service docker.socket
 ```
 
-Resultat attendu:
+Expected result:
 
-- `docker info` repond pour `svc_docker`.
-- `docker compose version` repond.
-- `docker.service` et `docker.socket` sont `masked/inactive`.
+- `docker info` responds for `svc_docker`.
+- `docker compose version` responds.
+- `docker.service` and `docker.socket` are `masked/inactive`.
 
-## Captures d ecran
+## Screenshots
 
-Ajoute tes captures dans `docs/images/`:
+Add your screenshots in `docs/images/`:
 
 - `docs/images/playbook-success.png`
 - `docs/images/docker-info-svc-user.png`
 - `docs/images/systemd-masked-services.png`
 
-Exemple d integration Markdown:
+Example Markdown integration:
 
 ```markdown
 ![Playbook success](docs/images/playbook-success.png)
@@ -139,8 +139,8 @@ Exemple d integration Markdown:
 ![System services masked](docs/images/systemd-masked-services.png)
 ```
 
-## Notes de securite
+## Security Notes
 
-- Le blocage `root` est une politique d exploitation (shell profile + services rootful masques).
-- `root` reste techniquement superutilisateur par conception Unix.
-- Pour une posture plus stricte, combine avec des controles sudoers et auditd.
+- Root blocking is an operations policy (shell profile + masked rootful services).
+- `root` remains technically a superuser by Unix design.
+- For a stricter posture, combine this with sudoers and auditd controls.
